@@ -1,0 +1,68 @@
+# Mock Conversation
+
+An AI-powered mock conversation tool that lets you practice conversations in any language, on any topic, with any AI role. Built with a Go backend and React TypeScript frontend.
+
+## Features
+
+- **Any Role**: Choose what role the AI plays (e.g., Spanish tutor, debate partner, travel guide, doctor)
+- **Any Topic**: Set any conversation topic
+- **Any Language**: 15+ supported languages for conversation
+- **Subtitles**: Optional translation subtitles in a different language
+- **Voice Interaction**: Speak and listen with audio recording and text-to-speech
+- **Conversation Summary**: Get a summary when you end the conversation
+
+## Server
+
+The server is built with Go 1.22 and is located in the `server` directory. It requires the following environment variables:
+
+- `OPENAI_API_KEY`: Your OpenAI API key (required)
+- `ELEVENLAB_API_KEY`: Your ElevenLab API key for alternative speech engine (optional)
+- `DB_PATH`: Path to SQLite database (optional, defaults to `./app.db`)
+
+Optional configurations:
+- `PORT`: The port number for the server to run (defaults to 8080)
+- `CORS_ALLOWED_ORIGINS`: Allowed origin to call the APIs
+- `CORS_ALLOWED_METHODS`: Allowed methods of the APIs call
+- `CORS_ALLOWED_HEADERS`: Allowed headers of the APIs call
+
+## Client
+
+The client is built using React TypeScript with Vite and Node.js 20. It is located in the `client` directory.
+
+- `VITE_BACKEND_URL`: URL of the backend server (optional, defaults to `http://0.0.0.0:8080`)
+
+## Running with Docker
+
+1. Make sure you have Docker and docker-compose installed.
+
+2. Create a `.env` file in the root directory:
+
+   ```
+   OPENAI_API_KEY=your_openai_api_key_here
+   ELEVENLAB_API_KEY=your_elevenlab_api_key_here
+   ```
+
+3. Run:
+
+   ```
+   docker-compose up --build
+   ```
+
+4. Open `http://localhost:3000` in your browser.
+
+## Development
+
+### Server
+
+```bash
+cd server
+go run main.go
+```
+
+### Client
+
+```bash
+cd client
+pnpm install
+pnpm run dev
+```

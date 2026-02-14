@@ -1,0 +1,6 @@
+*.db
+*.pid
+.claude
+.env
+.vite
+bin/*

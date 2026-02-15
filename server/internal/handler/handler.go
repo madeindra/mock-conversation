@@ -7,21 +7,18 @@ import (
 
 	"github.com/madeindra/mock-conversation/server/internal/config"
 	"github.com/madeindra/mock-conversation/server/internal/data"
-	"github.com/madeindra/mock-conversation/server/internal/elevenlab"
 	"github.com/madeindra/mock-conversation/server/internal/middleware"
 	"github.com/madeindra/mock-conversation/server/internal/openai"
 )
 
 type handler struct {
 	ai openai.Client
-	el elevenlab.Client
 	db *data.Database
 }
 
 func NewHandler(cfg config.AppConfig) *chi.Mux {
 	h := &handler{
 		ai: openai.NewOpenAI(cfg.APIKey),
-		el: elevenlab.NewElevenLab(cfg.TTSAPIKey),
 		db: data.New(cfg.DBPath),
 	}
 

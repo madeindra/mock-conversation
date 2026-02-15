@@ -92,15 +92,13 @@ const StartScreen: React.FC<StartScreenProps> = ({ backendHost, setError }) => {
 
   return (
     <div className="flex flex-col h-screen bg-white">
-      {messages.length > 0 && (
-        <Navbar
-          backendHost={backendHost}
-          showBackIcon
-          showForwardIcon
-          onForward={handleForward}
-          disableBack={true}
-        />
-      )}
+      <Navbar
+        backendHost={backendHost}
+        showBackIcon={messages.length > 0}
+        showForwardIcon={messages.length > 0}
+        onForward={handleForward}
+        disableBack={true}
+      />
       <div className="flex-grow flex items-center justify-center px-4">
         <div className="w-full max-w-md">
           <h1 className="text-2xl font-semibold text-gray-900 mb-8 text-center">Mock Conversation</h1>

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/madeindra/mock-conversation/server/internal/elevenlab"
 	"github.com/madeindra/mock-conversation/server/internal/openai"
 )
 
@@ -141,17 +140,18 @@ func GenerateEndChat(ai openai.Client, history []openai.ChatMessage, subtitleLan
 	return result, nil
 }
 
-func GenerateSpeech(el elevenlab.Client, text, voice string) (string, error) {
-	if el == nil {
+func GenerateSpeech(ai openai.Client, text, voice string) (string, error) {
+	if ai == nil {
 		return "", nil
 	}
 
 	speechInput := SanitizeString(text)
 
-	speech, err := el.TextToSpeech(speechInput, voice)
+	speech, err := ai.Speech(speechInput, voice)
 	if err != nil {
 		return "", err
 	}
+	defer speech.Close()
 
 	speechByte, err := io.ReadAll(speech)
 	if err != nil {

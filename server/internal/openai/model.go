@@ -33,6 +33,12 @@ const (
 	ROLE_USER      Role = "user"
 )
 
+type SpeechRequest struct {
+	Model string `json:"model"`
+	Voice string `json:"voice"`
+	Input string `json:"input"`
+}
+
 // TranscriptResponse is the response from the transcription API.
 type TranscriptResponse struct {
 	Text string `json:"text"`

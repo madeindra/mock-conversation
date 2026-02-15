@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -16,6 +17,8 @@ type Client interface {
 	Status() (Status, error)
 	Chat([]ChatMessage) (string, error)
 	Transcribe(audio io.Reader, filename string, language string) (string, error)
+	Speech(text string, voice string) (io.ReadCloser, error)
+	RandomVoice() string
 
 	GetDefaultTranscriptLanguage() string
 }
@@ -25,6 +28,7 @@ type OpenAI struct {
 	baseURL            string
 	chatModel          string
 	transcriptModel    string
+	ttsModel           string
 	transcriptLanguage string
 }
 
@@ -33,8 +37,24 @@ const (
 	statusURL          = "https://status.openai.com/api/v2"
 	chatModel          = "gpt-4o-mini"
 	transcriptModel    = "gpt-4o-mini-transcribe"
+	ttsModel           = "gpt-4o-mini-tts"
 	transcriptLanguage = "en"
 )
+
+var ttsVoices = []string{
+	"alloy",
+	"ash",
+	"ballad",
+	"coral",
+	"echo",
+	"fable",
+	"marin",
+	"nova",
+	"onyx",
+	"sage",
+	"shimmer",
+	"verse",
+}
 
 func NewOpenAI(apiKey string) *OpenAI {
 	return &OpenAI{
@@ -42,8 +62,13 @@ func NewOpenAI(apiKey string) *OpenAI {
 		baseURL:            baseURL,
 		chatModel:          chatModel,
 		transcriptModel:    transcriptModel,
+		ttsModel:           ttsModel,
 		transcriptLanguage: transcriptLanguage,
 	}
+}
+
+func (c *OpenAI) RandomVoice() string {
+	return ttsVoices[rand.Intn(len(ttsVoices))]
 }
 
 func (c *OpenAI) IsKeyValid() (bool, error) {
@@ -226,6 +251,39 @@ func (c *OpenAI) Transcribe(audio io.Reader, filename string, language string) (
 	}
 
 	return transcriptResp.Text, nil
+}
+
+func (c *OpenAI) Speech(text string, voice string) (io.ReadCloser, error) {
+	url, err := url.JoinPath(c.baseURL, "/audio/speech")
+	if err != nil {
+		return nil, err
+	}
+
+	speechReq := SpeechRequest{
+		Model: c.ttsModel,
+		Voice: voice,
+		Input: text,
+	}
+
+	body, err := json.Marshal(speechReq)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return getResponseBody(resp)
 }
 
 func (c *OpenAI) GetDefaultTranscriptLanguage() string {

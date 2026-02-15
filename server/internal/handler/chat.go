@@ -20,37 +20,30 @@ func (h *handler) Status(w http.ResponseWriter, _ *http.Request) {
 	isKeyValid, err := h.ai.IsKeyValid()
 	if err != nil {
 		log.Printf("failed to check key validity: %v", err)
-		util.SendResponse(w, nil, "failed to check key validity", http.StatusInternalServerError)
-
-		return
 	}
 
 	status, err := h.ai.Status()
 	if err != nil {
 		log.Printf("failed to check API availability: %v", err)
-		util.SendResponse(w, nil, "failed to check API availability", http.StatusInternalServerError)
-
-		return
 	}
 
-	var apiState *bool
-
+	var apiAvailable *bool
 	switch status {
 	case openai.STATUS_OPERATIONAL:
-		apiState = util.Pointer(true)
+		apiAvailable = util.Pointer(true)
 	case openai.STATUS_DEGRADED_PERFORMANCE, openai.STATUS_PARTIAL_OUTAGE, openai.STATUS_MAJOR_OUTAGE:
-		apiState = util.Pointer(false)
+		apiAvailable = util.Pointer(false)
 	case openai.STATUS_UNKNOWN:
-		apiState = nil
+		apiAvailable = nil
 	}
 
 	apiStatus := util.Pointer(string(status))
 
 	response := model.StatusResponse{
-		Server:    true,
-		Key:       isKeyValid,
-		API:       apiState,
-		ApiStatus: apiStatus,
+		Server:       true,
+		APIAvailable: apiAvailable,
+		APIStatus:    apiStatus,
+		KeyValid:     isKeyValid,
 	}
 
 	util.SendResponse(w, response, "success", http.StatusOK)
@@ -84,13 +77,10 @@ func (h *handler) StartChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Pick a random ElevenLabs voice for this conversation
-	var voice string
-	if h.el != nil {
-		voice = h.el.RandomVoice()
-	}
+	// Pick a random voice for this conversation
+	voice := h.ai.RandomVoice()
 
-	initialAudio, err := util.GenerateSpeech(h.el, initialResult.Response, voice)
+	initialAudio, err := util.GenerateSpeech(h.ai, initialResult.Response, voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
@@ -250,7 +240,7 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 	// Set the transcript from Whisper (not from the chat model)
 	answerResult.Transcript = transcript
 
-	answerAudio, err := util.GenerateSpeech(h.el, answerResult.Response, user.Voice)
+	answerAudio, err := util.GenerateSpeech(h.ai, answerResult.Response, user.Voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
@@ -358,7 +348,7 @@ func (h *handler) EndChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	answerAudio, err := util.GenerateSpeech(h.el, endResult.Response, user.Voice)
+	answerAudio, err := util.GenerateSpeech(h.ai, endResult.Response, user.Voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)

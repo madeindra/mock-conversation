@@ -15,10 +15,10 @@ interface NavbarProps {
 interface StatusResponse {
   message: string;
   data: {
-    backend: boolean;
-    api: boolean | null;
-    apiStatus: string | null;
-    key: boolean;
+    server: boolean;
+    apiAvailable: boolean | null;
+    apiStatus?: string | null;
+    keyValid: boolean;
   };
 }
 
@@ -59,13 +59,14 @@ const Navbar: React.FC<NavbarProps> = ({
 
   const getStatusColor = () => {
     if (!status) return 'bg-red-400';
-    if (status.backend && status.api === true && status.key) return 'bg-emerald-400';
-    if (status.api === false) return 'bg-amber-400';
+    if (status.server && status.apiAvailable === true && status.keyValid) return 'bg-emerald-400';
+    if (status.apiAvailable === false) return 'bg-amber-400';
     return 'bg-red-400';
   };
 
-  const capitalizeFirstLetter = (string: string) => {
-    return string.charAt(0).toUpperCase() + string.slice(1);
+  const formatStatus = (s?: string | null) => {
+    if (!s) return 'Unknown';
+    return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
 
   if (!showBackIcon && !showForwardIcon && !showStartOver && !status) {
@@ -128,10 +129,10 @@ const Navbar: React.FC<NavbarProps> = ({
           <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor()}`} />
           {showTooltip && (
             <div className="absolute top-full right-0 mt-2 p-3 bg-white border border-gray-200 rounded-lg shadow-lg z-10 text-xs text-gray-600 whitespace-nowrap">
-              <p>Server: {status?.backend ? 'Up' : 'Down'}</p>
-              <p>API: {status?.api === null ? 'Unknown' : (status?.api ? 'Up' : 'Down')}</p>
-              <p>Status: {status?.apiStatus ? capitalizeFirstLetter(status?.apiStatus) : 'Unknown'}</p>
-              <p>Authorized: {status?.key ? 'Yes' : 'No'}</p>
+              <p>Server: {status?.server ? 'Up' : 'Down'}</p>
+              <p>OpenAI API: {status?.apiAvailable === null ? 'Unknown' : (status?.apiAvailable ? 'Up' : 'Down')}</p>
+              <p>OpenAI Status: {formatStatus(status?.apiStatus)}</p>
+              <p>API Key: {status?.keyValid ? 'Valid' : 'Invalid'}</p>
             </div>
           )}
         </div>

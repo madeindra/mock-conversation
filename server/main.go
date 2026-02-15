@@ -10,10 +10,9 @@ import (
 )
 
 const (
-	envPort      = "PORT"
-	envAPIKey    = "OPENAI_API_KEY"
-	envTTSAPIKey = "ELEVENLAB_API_KEY"
-	envDBPath    = "DB_PATH"
+	envPort   = "PORT"
+	envAPIKey = "OPENAI_API_KEY"
+	envDBPath = "DB_PATH"
 
 	envCORSOrigins = "CORS_ALLOWED_ORIGINS"
 	envCORSMethods = "CORS_ALLOWED_METHODS"
@@ -49,10 +48,9 @@ func main() {
 
 func initConfig() (config.AppConfig, error) {
 	cfg := config.AppConfig{
-		Port:        config.GetString(envPort, defaultPort),
-		APIKey:      config.GetString(envAPIKey, ""),
-		TTSAPIKey:   config.GetString(envTTSAPIKey, ""),
-		DBPath:      config.GetString(envDBPath, "./app.db"),
+		Port:   config.GetString(envPort, defaultPort),
+		APIKey: config.GetString(envAPIKey, ""),
+		DBPath: config.GetString(envDBPath, "./app.db"),
 		CORSOrigins: config.GetStrings(envCORSOrigins, defaultCORSOrigin),
 		CORSMethods: config.GetStrings(envCORSMethods, defaultCORSMethods),
 		CORSHeaders: config.GetStrings(envCORSHeaders, defaultCORSHeaders),

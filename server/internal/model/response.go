@@ -21,8 +21,8 @@ type AnswerChatResponse struct {
 }
 
 type StatusResponse struct {
-	Server    bool    `json:"backend"`
-	API       *bool   `json:"api"`
-	ApiStatus *string `json:"apiStatus"`
-	Key       bool    `json:"key"`
+	Server       bool    `json:"server"`
+	APIAvailable *bool   `json:"apiAvailable"`
+	APIStatus    *string `json:"apiStatus,omitempty"`
+	KeyValid     bool    `json:"keyValid"`
 }

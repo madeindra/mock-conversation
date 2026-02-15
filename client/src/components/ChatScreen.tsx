@@ -118,7 +118,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ backendHost, setError }) => {
 
         setHasStarted(true);
 
-        // Auto-end conversation if AI detected user wants to end
         if (data.data.isLast) {
           setHasEnded(true);
         }
@@ -223,7 +222,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ backendHost, setError }) => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#1E1E2E] text-white">
+    <div className="flex flex-col h-screen bg-white">
       <Navbar
         backendHost={backendHost}
         showBackIcon
@@ -233,59 +232,65 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ backendHost, setError }) => {
         onStartOver={handleStartOver}
         disableForward={true}
       />
-      <div ref={chatContainerRef} className="flex-grow overflow-y-auto px-4 py-2">
-        {messages.map((message, index) => (
-          <div key={index} className={`mb-4 ${message.isUser ? 'text-right' : 'text-left'}`}>
-            <span className={`inline-block p-3 rounded-2xl ${message.isUser
-              ? 'bg-[#3E64FF] text-white'
-              : 'bg-[#2B2B3B] text-white'
-              }`}>
-              {message.isAnimated
-                ? <AnimatedText message={message} />
-                : message.text
-              }
-            </span>
-            {message.subtitle && (
-              <div className={`mt-1 text-sm text-gray-400 italic ${message.isUser ? 'text-right' : 'text-left'}`}>
-                {message.subtitle}
+      <div ref={chatContainerRef} className="flex-grow overflow-y-auto px-4 py-4">
+        <div className="max-w-2xl mx-auto space-y-3">
+          {messages.map((message, index) => (
+            <div key={index} className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+              <div className="max-w-[80%]">
+                <div className={`inline-block px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${message.isUser
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-900'
+                  }`}>
+                  {message.isAnimated
+                    ? <AnimatedText message={message} />
+                    : message.text
+                  }
+                </div>
+                {message.subtitle && (
+                  <div className={`mt-1 text-xs text-gray-400 italic px-1 ${message.isUser ? 'text-right' : 'text-left'}`}>
+                    {message.subtitle}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="flex justify-between items-center space-x-4 p-4 bg-[#1E1E2E]">
-        <button
-          onClick={isRecording ? stopRecording : startRecording}
-          disabled={isProcessing || hasEnded}
-          className={`w-full p-4 rounded-xl font-bold text-lg transition-all duration-300 ${isProcessing || hasEnded
-            ? 'bg-[#2B2B3B] text-gray-400 cursor-not-allowed'
-            : isRecording
-              ? 'bg-[#FF3E3E] text-white animate-pulse'
-              : 'bg-[#3E64FF] text-white hover:bg-opacity-90'
-            }`}
-        >
-          {isProcessing
-            ? 'Processing...'
-            : isRecording
-              ? 'Stop Recording'
-              : hasEnded
-                ? 'This conversation has ended'
-                : 'Record Answer'
-          }
-        </button>
-        {hasStarted && !hasEnded && (
+      <div className="border-t border-gray-100 bg-white px-4 py-3">
+        <div className="max-w-2xl mx-auto flex gap-3">
           <button
-            onClick={endConversation}
-            disabled={isProcessing || isRecording || hasEnded}
-            className={`w-3/12 p-4 rounded-xl font-bold text-lg hover:bg-opacity-90 transition-all duration-300 ${isProcessing || isRecording || hasEnded
-              ? 'bg-[#2B2B3B] text-gray-400 cursor-not-allowed'
-              : 'bg-[#FF3E3E] text-white hover:bg-opacity-90'
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={isProcessing || hasEnded}
+            className={`flex-grow py-3 rounded-xl font-medium text-sm transition-all ${isProcessing || hasEnded
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : isRecording
+                ? 'bg-red-500 text-white animate-pulse'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
               }`}
           >
-            End
+            {isProcessing
+              ? 'Processing...'
+              : isRecording
+                ? 'Stop Recording'
+                : hasEnded
+                  ? 'Conversation ended'
+                  : 'Record Answer'
+            }
           </button>
-        )}
+          {hasStarted && !hasEnded && (
+            <button
+              onClick={endConversation}
+              disabled={isProcessing || isRecording || hasEnded}
+              className={`px-5 py-3 rounded-xl font-medium text-sm transition-all ${isProcessing || isRecording || hasEnded
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-white border border-red-300 text-red-500 hover:bg-red-50'
+                }`}
+            >
+              End
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

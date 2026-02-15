@@ -37,7 +37,6 @@ const StartScreen: React.FC<StartScreenProps> = ({ backendHost, setError }) => {
 
   const navigate = useNavigate();
 
-  // Filter out selected conversation language from subtitle options
   const subtitleOptions = languageOptions.filter(lang => lang.code !== language);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -94,7 +93,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ backendHost, setError }) => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#1E1E2E] text-white">
+    <div className="flex flex-col h-screen bg-white">
       {messages.length > 0 && (
         <Navbar
           backendHost={backendHost}
@@ -104,47 +103,46 @@ const StartScreen: React.FC<StartScreenProps> = ({ backendHost, setError }) => {
           disableBack={true}
         />
       )}
-      <div className="container mx-auto mt-10 p-4 flex-grow">
-        <div className="max-w-md mx-auto bg-[#2B2B3B] p-8 rounded-xl shadow-lg">
-          <h1 className="text-3xl font-bold mb-6 text-center text-white">Mock Conversation</h1>
-          <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex-grow flex items-center justify-center px-4">
+        <div className="w-full max-w-md">
+          <h1 className="text-2xl font-semibold text-gray-900 mb-8 text-center">Mock Conversation</h1>
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="role" className="block mb-2 text-white font-semibold">AI Role</label>
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1.5">AI Role</label>
               <input
                 type="text"
                 id="role"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
                 placeholder="e.g. Spanish tutor, debate partner, travel guide"
-                className="w-full p-3 bg-[#3A3A4E] text-white border border-[#4A4A5E] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3E64FF]"
+                className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow"
                 required
               />
             </div>
             <div>
-              <label htmlFor="topic" className="block mb-2 text-white font-semibold">Topic</label>
+              <label htmlFor="topic" className="block text-sm font-medium text-gray-700 mb-1.5">Topic</label>
               <input
                 type="text"
                 id="topic"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="e.g. Traveling in Japan, learning to cook, philosophy"
-                className="w-full p-3 bg-[#3A3A4E] text-white border border-[#4A4A5E] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3E64FF]"
+                className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow"
                 required
               />
             </div>
             <div>
-              <label htmlFor="language" className="block mb-2 text-white font-semibold">Conversation Language</label>
+              <label htmlFor="language" className="block text-sm font-medium text-gray-700 mb-1.5">Language</label>
               <select
                 id="language"
                 value={language}
                 onChange={(e) => {
                   setLanguage(e.target.value);
-                  // Reset subtitle if it matches new language
                   if (subtitleLanguage === e.target.value) {
                     setSubtitleLanguage('');
                   }
                 }}
-                className="w-full p-3 bg-[#3A3A4E] text-white border border-[#4A4A5E] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3E64FF]"
+                className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow"
                 required
               >
                 {languageOptions.map((lang) => (
@@ -153,12 +151,12 @@ const StartScreen: React.FC<StartScreenProps> = ({ backendHost, setError }) => {
               </select>
             </div>
             <div>
-              <label htmlFor="subtitleLanguage" className="block mb-2 text-white font-semibold">Subtitle Language (Optional)</label>
+              <label htmlFor="subtitleLanguage" className="block text-sm font-medium text-gray-700 mb-1.5">Subtitle Language <span className="text-gray-400 font-normal">(Optional)</span></label>
               <select
                 id="subtitleLanguage"
                 value={subtitleLanguage}
                 onChange={(e) => setSubtitleLanguage(e.target.value)}
-                className="w-full p-3 bg-[#3A3A4E] text-white border border-[#4A4A5E] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3E64FF]"
+                className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow"
               >
                 <option value="">No subtitles</option>
                 {subtitleOptions.map((lang) => (
@@ -166,7 +164,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ backendHost, setError }) => {
                 ))}
               </select>
             </div>
-            <button type="submit" className="w-full p-4 bg-[#3E64FF] text-white font-bold rounded-xl hover:bg-opacity-90 transition-all duration-300">
+            <button type="submit" className="w-full py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors mt-2">
               Start Conversation
             </button>
           </form>

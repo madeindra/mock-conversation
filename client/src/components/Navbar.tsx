@@ -52,16 +52,16 @@ const Navbar: React.FC<NavbarProps> = ({
     };
 
     fetchStatus();
-    const intervalId = setInterval(fetchStatus, 30000); // Fetch every 30 seconds
+    const intervalId = setInterval(fetchStatus, 30000);
 
     return () => clearInterval(intervalId);
   }, [backendHost]);
 
   const getStatusColor = () => {
-    if (!status) return 'bg-red-500';
-    if (status.backend && status.api === true && status.key) return 'bg-green-500';
-    if (status.api === false) return 'bg-orange-500';
-    return 'bg-red-500';
+    if (!status) return 'bg-red-400';
+    if (status.backend && status.api === true && status.key) return 'bg-emerald-400';
+    if (status.api === false) return 'bg-amber-400';
+    return 'bg-red-400';
   };
 
   const capitalizeFirstLetter = (string: string) => {
@@ -94,36 +94,41 @@ const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <nav className="bg-dark-surface p-4 flex justify-between items-center relative">
-      <div className="flex items-center">
+    <nav className="px-4 py-3 flex justify-between items-center border-b border-gray-100 bg-white relative">
+      <div className="flex items-center gap-2">
         {showBackIcon && (
           <button
             onClick={handleBack}
-            className={`mr-4 ${disableBack ? 'text-gray-500 cursor-not-allowed' : 'text-white hover:text-gray-300'}`}
+            className={`p-1.5 rounded-md transition-colors ${disableBack ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
             disabled={disableBack}
           >
-            &#8592; {/* Left arrow */}
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
           </button>
         )}
         {showForwardIcon && (
           <button
             onClick={handleForward}
-            className={`${disableForward ? 'text-gray-500 cursor-not-allowed' : 'text-white hover:text-gray-300'}`}
+            className={`p-1.5 rounded-md transition-colors ${disableForward ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
             disabled={disableForward}
           >
-            &#8594; {/* Right arrow */}
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
         )}
       </div>
-      <div className="flex items-center">
+      <div className="flex items-center gap-3">
         <div
-          className={`w-4 h-4 rounded-full mr-4 ${getStatusColor()}`}
+          className="relative"
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
+          <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor()}`} />
           {showTooltip && (
-            <div className="absolute top-full right-2 mt-2 p-2 bg-white text-black rounded shadow-lg z-10">
-              <p>Database: {status?.backend ? 'Up' : 'Down'}</p>
+            <div className="absolute top-full right-0 mt-2 p-3 bg-white border border-gray-200 rounded-lg shadow-lg z-10 text-xs text-gray-600 whitespace-nowrap">
+              <p>Server: {status?.backend ? 'Up' : 'Down'}</p>
               <p>API: {status?.api === null ? 'Unknown' : (status?.api ? 'Up' : 'Down')}</p>
               <p>Status: {status?.apiStatus ? capitalizeFirstLetter(status?.apiStatus) : 'Unknown'}</p>
               <p>Authorized: {status?.key ? 'Yes' : 'No'}</p>
@@ -133,9 +138,11 @@ const Navbar: React.FC<NavbarProps> = ({
         {showStartOver && (
           <button
             onClick={handleStartOver}
-            className="text-white hover:text-gray-300"
+            className="p-1.5 rounded-md text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
           >
-            &#x2715; {/* Multiplication symbol */}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         )}
       </div>

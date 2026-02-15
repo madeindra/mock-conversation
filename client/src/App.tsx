@@ -10,17 +10,15 @@ const App: React.FC = () => {
 
   return (
     <Router>
-      <div className="min-h-screen bg-dark-bg text-dark-on-bg flex flex-col relative">
+      <div className="min-h-screen bg-white text-gray-900 flex flex-col relative">
         {error && (
-          <div className="absolute top-0 left-0 right-0 bg-dark-error text-dark-on-surface px-4 py-3 z-50" role="alert">
-            <strong className="font-bold">Error: </strong>
-            <span className="block sm:inline">{error}</span>
-            <span className="absolute top-0 bottom-0 right-0 px-4 py-3">
-              <svg className="fill-current h-6 w-6 text-dark-on-surface" role="button" onClick={() => setError(null)} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                <title>Close</title>
+          <div className="absolute top-4 left-4 right-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg z-50 flex items-center justify-between" role="alert">
+            <span className="text-sm">{error}</span>
+            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 ml-4">
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
               </svg>
-            </span>
+            </button>
           </div>
         )}
         <div className="flex-grow">

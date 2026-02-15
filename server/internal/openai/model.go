@@ -1,8 +1,23 @@
 package openai
 
+type ResponseFormat struct {
+	Type string `json:"type"`
+}
+
 type ChatRequest struct {
-	Messages []ChatMessage `json:"messages"`
-	Model    string        `json:"model"`
+	Messages       []ChatMessage   `json:"messages"`
+	Model          string          `json:"model"`
+	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
+}
+
+type ChatResponse struct {
+	Choices []Choice `json:"choices"`
+}
+
+type Choice struct {
+	Index        int         `json:"index"`
+	Message      ChatMessage `json:"message"`
+	FinishReason string      `json:"finish_reason"`
 }
 
 type AudioChatRequest struct {
@@ -25,10 +40,6 @@ type AudioContentPart struct {
 type InputAudio struct {
 	Data   string `json:"data"`
 	Format string `json:"format"`
-}
-
-type ChatResponse struct {
-	Choices []Choice `json:"choices"`
 }
 
 type AudioChatResponse struct {
@@ -59,14 +70,13 @@ const (
 	ROLE_USER      Role = "user"
 )
 
-type Choice struct {
-	Index        int         `json:"index"`
-	Message      ChatMessage `json:"message"`
-	FinishReason string      `json:"finish_reason"`
-}
-
-type TranscriptResponse struct {
-	Text string `json:"text"`
+// AnswerChatResult is the JSON response from ChatGPT for all chat operations.
+type AnswerChatResult struct {
+	Transcript         string `json:"transcript,omitempty"`
+	TranscriptSubtitle string `json:"transcriptSubtitle,omitempty"`
+	Response           string `json:"response"`
+	ResponseSubtitle   string `json:"responseSubtitle,omitempty"`
+	IsLast             bool   `json:"isLast"`
 }
 
 type Status string

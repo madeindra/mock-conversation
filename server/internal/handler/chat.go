@@ -1,14 +1,12 @@
 package handler
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/madeindra/mock-conversation/server/internal/config"
 	"github.com/madeindra/mock-conversation/server/internal/data"
@@ -78,7 +76,7 @@ func (h *handler) StartChat(w http.ResponseWriter, req *http.Request) {
 		subtitleLanguage = config.GetLanguageName(startChatRequest.SubtitleLanguage)
 	}
 
-	systemPrompt, initialText, err := util.GetChatAssets(h.ai, startChatRequest.Role, startChatRequest.Topic, config.GetLanguageName(startChatRequest.Language))
+	systemPrompt, initialResult, err := util.GenerateStartChat(h.ai, startChatRequest.Role, startChatRequest.Topic, config.GetLanguageName(startChatRequest.Language), subtitleLanguage)
 	if err != nil {
 		log.Printf("failed to get system prompt or initial text: %v", err)
 		util.SendResponse(w, nil, "failed to prepare chat", http.StatusInternalServerError)
@@ -92,22 +90,12 @@ func (h *handler) StartChat(w http.ResponseWriter, req *http.Request) {
 		voice = h.el.RandomVoice()
 	}
 
-	initialAudio, err := util.GenerateSpeech(h.el, initialText, voice)
+	initialAudio, err := util.GenerateSpeech(h.el, initialResult.Response, voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
 
 		return
-	}
-
-	// Generate subtitle for initial text if subtitle language is enabled
-	var initialSubtitle string
-	if subtitleLanguage != "" {
-		initialSubtitle, err = util.GenerateSubtitle(h.ai, initialText, subtitleLanguage)
-		if err != nil {
-			log.Printf("failed to generate subtitle: %v", err)
-			// Non-fatal: continue without subtitle
-		}
 	}
 
 	plainSecret := util.GenerateRandom()
@@ -143,7 +131,7 @@ func (h *handler) StartChat(w http.ResponseWriter, req *http.Request) {
 		},
 		{
 			Role:  string(openai.ROLE_ASSISTANT),
-			Text:  initialText,
+			Text:  initialResult.Response,
 			Audio: initialAudio,
 		},
 	}); err != nil {
@@ -165,9 +153,9 @@ func (h *handler) StartChat(w http.ResponseWriter, req *http.Request) {
 		Secret:   plainSecret,
 		Language: startChatRequest.Language,
 		Chat: model.Chat{
-			Text:     initialText,
+			Text:     initialResult.Response,
 			Audio:    initialAudio,
-			Subtitle: initialSubtitle,
+			Subtitle: initialResult.ResponseSubtitle,
 		},
 	}
 
@@ -232,21 +220,17 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Transcribe audio via Whisper for user's transcript display
-	audioReader := io.NopCloser(bytes.NewReader(audioBytes))
-	transcriptText, err := util.TranscribeSpeech(h.ai, audioReader, fileHeader.Filename, user.Language)
-	if err != nil {
-		log.Printf("failed to transcribe speech: %v", err)
-		util.SendResponse(w, nil, "failed to transcribe speech", http.StatusInternalServerError)
-
-		return
+	// Resolve subtitle language name
+	subtitleLanguage := ""
+	if user.SubtitleLanguage != "" {
+		subtitleLanguage = config.GetLanguageName(config.GetCode(user.SubtitleLanguage))
 	}
 
-	// Send audio to gpt-audio-mini for the AI response
+	// Send audio to gpt-audio-mini — returns transcript + response + isLast in one call
 	audioBase64 := base64.StdEncoding.EncodeToString(audioBytes)
 	history := util.ConvertToChatMessage(entries)
 
-	answerText, err := util.GenerateTextFromAudio(h.ai, history, audioBase64, "wav")
+	answerResult, err := util.GenerateTextFromAudio(h.ai, history, audioBase64, "wav", subtitleLanguage)
 	if err != nil {
 		log.Printf("failed to get chat completion: %v", err)
 		util.SendResponse(w, nil, fmt.Sprintf("failed to get chat completion: %v", err), http.StatusInternalServerError)
@@ -254,35 +238,12 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Detect if AI signals end of conversation with [END] marker
-	isLast := false
-	if strings.HasPrefix(answerText, "[END]") {
-		isLast = true
-		answerText = strings.TrimPrefix(answerText, "[END]")
-		answerText = strings.TrimSpace(answerText)
-	}
-
-	answerAudio, err := util.GenerateSpeech(h.el, answerText, user.Voice)
+	answerAudio, err := util.GenerateSpeech(h.el, answerResult.Response, user.Voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
 
 		return
-	}
-
-	// Generate subtitle translation if enabled
-	var answerSubtitle string
-	var promptSubtitle string
-	if user.SubtitleLanguage != "" {
-		subtitleLangName := config.GetLanguageName(config.GetCode(user.SubtitleLanguage))
-		answerSubtitle, err = util.GenerateSubtitle(h.ai, answerText, subtitleLangName)
-		if err != nil {
-			log.Printf("failed to generate answer subtitle: %v", err)
-		}
-		promptSubtitle, err = util.GenerateSubtitle(h.ai, transcriptText, subtitleLangName)
-		if err != nil {
-			log.Printf("failed to generate prompt subtitle: %v", err)
-		}
 	}
 
 	tx, err := h.db.BeginTx()
@@ -297,11 +258,11 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 	if _, err := h.db.CreateChats(tx, userID, []data.Entry{
 		{
 			Role: string(openai.ROLE_USER),
-			Text: transcriptText,
+			Text: answerResult.Transcript,
 		},
 		{
 			Role:  string(openai.ROLE_ASSISTANT),
-			Text:  answerText,
+			Text:  answerResult.Response,
 			Audio: answerAudio,
 		},
 	}); err != nil {
@@ -320,15 +281,15 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 
 	response := model.AnswerChatResponse{
 		Language: config.GetCode(user.Language),
-		IsLast:   isLast,
+		IsLast:   answerResult.IsLast,
 		Prompt: model.Chat{
-			Text:     transcriptText,
-			Subtitle: promptSubtitle,
+			Text:     answerResult.Transcript,
+			Subtitle: answerResult.TranscriptSubtitle,
 		},
 		Answer: model.Chat{
-			Text:     answerText,
+			Text:     answerResult.Response,
 			Audio:    answerAudio,
-			Subtitle: answerSubtitle,
+			Subtitle: answerResult.ResponseSubtitle,
 		},
 	}
 
@@ -361,7 +322,7 @@ func (h *handler) EndChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	entry, err := h.db.GetChatsByChatUserID(user.ID)
+	entries, err := h.db.GetChatsByChatUserID(user.ID)
 	if err != nil {
 		log.Printf("failed to get chat: %v", err)
 		util.SendResponse(w, nil, "failed to get chat", http.StatusInternalServerError)
@@ -369,14 +330,15 @@ func (h *handler) EndChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	history := util.ConvertToChatMessage(entry)
+	// Resolve subtitle language name
+	subtitleLanguage := ""
+	if user.SubtitleLanguage != "" {
+		subtitleLanguage = config.GetLanguageName(config.GetCode(user.SubtitleLanguage))
+	}
 
-	chatHistory := append(history, openai.ChatMessage{
-		Role:    openai.ROLE_USER,
-		Content: "[ENDCONV]",
-	})
+	history := util.ConvertToChatMessage(entries)
 
-	answerText, err := util.GenerateText(h.ai, chatHistory)
+	endResult, err := util.GenerateEndChat(h.ai, history, subtitleLanguage)
 	if err != nil {
 		log.Printf("failed to get chat completion: %v", err)
 		util.SendResponse(w, nil, "failed to get chat completion", http.StatusInternalServerError)
@@ -384,28 +346,12 @@ func (h *handler) EndChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Strip [END] marker if the AI includes it
-	if strings.HasPrefix(answerText, "[END]") {
-		answerText = strings.TrimPrefix(answerText, "[END]")
-		answerText = strings.TrimSpace(answerText)
-	}
-
-	answerAudio, err := util.GenerateSpeech(h.el, answerText, user.Voice)
+	answerAudio, err := util.GenerateSpeech(h.el, endResult.Response, user.Voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
 
 		return
-	}
-
-	// Generate subtitle for end message if enabled
-	var answerSubtitle string
-	if user.SubtitleLanguage != "" {
-		subtitleLangName := config.GetLanguageName(config.GetCode(user.SubtitleLanguage))
-		answerSubtitle, err = util.GenerateSubtitle(h.ai, answerText, subtitleLangName)
-		if err != nil {
-			log.Printf("failed to generate subtitle: %v", err)
-		}
 	}
 
 	tx, err := h.db.BeginTx()
@@ -417,7 +363,7 @@ func (h *handler) EndChat(w http.ResponseWriter, req *http.Request) {
 	}
 	defer tx.Rollback()
 
-	if _, err := h.db.CreateChat(tx, userID, string(openai.ROLE_ASSISTANT), answerText, answerAudio); err != nil {
+	if _, err := h.db.CreateChat(tx, userID, string(openai.ROLE_ASSISTANT), endResult.Response, answerAudio); err != nil {
 		log.Printf("failed to create chat: %v", err)
 		util.SendResponse(w, nil, "failed to create chat", http.StatusInternalServerError)
 
@@ -435,9 +381,9 @@ func (h *handler) EndChat(w http.ResponseWriter, req *http.Request) {
 		Language: config.GetCode(user.Language),
 		IsLast:   true,
 		Answer: model.Chat{
-			Text:     answerText,
+			Text:     endResult.Response,
 			Audio:    answerAudio,
-			Subtitle: answerSubtitle,
+			Subtitle: endResult.ResponseSubtitle,
 		},
 	}
 

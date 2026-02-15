@@ -2,24 +2,56 @@ package util
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/madeindra/mock-conversation/server/internal/elevenlab"
 	"github.com/madeindra/mock-conversation/server/internal/openai"
 )
 
-func GetChatAssets(ai openai.Client, role string, topic string, language string) (string, string, error) {
+// extractJSON finds and returns the first JSON object in a string.
+// Handles cases where the model wraps JSON in markdown code fences or adds extra text.
+func extractJSON(raw string) string {
+	s := strings.TrimSpace(raw)
+
+	// Strip markdown code fences
+	if strings.HasPrefix(s, "```") {
+		if idx := strings.Index(s, "\n"); idx != -1 {
+			s = s[idx+1:]
+		}
+		if idx := strings.LastIndex(s, "```"); idx != -1 {
+			s = s[:idx]
+		}
+		return strings.TrimSpace(s)
+	}
+
+	// Find the first { and last } to extract the JSON object
+	start := strings.Index(s, "{")
+	end := strings.LastIndex(s, "}")
+	if start != -1 && end != -1 && end > start {
+		return s[start : end+1]
+	}
+
+	return s
+}
+
+func GenerateStartChat(ai openai.Client, role, topic, language, subtitleLanguage string) (string, openai.AnswerChatResult, error) {
 	if ai == nil {
-		return "", "", fmt.Errorf("unsupported client")
+		return "", openai.AnswerChatResult{}, fmt.Errorf("unsupported client")
 	}
 
 	systemPrompt, err := openai.GetSystemPrompt(role, topic, language)
 	if err != nil {
-		return "", "", err
+		return "", openai.AnswerChatResult{}, err
 	}
 
-	// Generate initial greeting dynamically via AI so it's in the correct language
+	jsonInstruction := `Respond in JSON with: {"response": "your greeting"}`
+	if subtitleLanguage != "" {
+		jsonInstruction = fmt.Sprintf(`Respond in JSON with: {"response": "your greeting", "responseSubtitle": "translation of your greeting in %s"}`, subtitleLanguage)
+	}
+
 	messages := []openai.ChatMessage{
 		{
 			Role:    openai.ROLE_SYSTEM,
@@ -27,71 +59,106 @@ func GetChatAssets(ai openai.Client, role string, topic string, language string)
 		},
 		{
 			Role:    openai.ROLE_USER,
-			Content: "Start the conversation with a brief greeting and introduce the topic.",
+			Content: "Start the conversation with a brief greeting and introduce the topic. " + jsonInstruction,
 		},
 	}
 
-	initialChat, err := ai.Chat(messages)
+	rawResponse, err := ai.Chat(messages)
 	if err != nil {
-		return "", "", err
+		return "", openai.AnswerChatResult{}, err
 	}
 
-	if initialChat == "" {
-		return "", "", fmt.Errorf("empty initial chat response")
+	jsonStr := extractJSON(rawResponse)
+
+	var result openai.AnswerChatResult
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return "", openai.AnswerChatResult{}, fmt.Errorf("failed to parse initial chat JSON: %w, raw: %s", err, rawResponse)
 	}
 
-	return systemPrompt, initialChat, nil
+	if result.Response == "" {
+		return "", openai.AnswerChatResult{}, fmt.Errorf("empty initial chat response")
+	}
+
+	return systemPrompt, result, nil
 }
 
-func TranscribeSpeech(ai openai.Client, file io.ReadCloser, filename, language string) (string, error) {
+func GenerateTextFromAudio(ai openai.Client, history []openai.ChatMessage, audioData, audioFormat, subtitleLanguage string) (openai.AnswerChatResult, error) {
 	if ai == nil {
-		return "", fmt.Errorf("unsupported client")
+		return openai.AnswerChatResult{}, fmt.Errorf("unsupported client")
 	}
 
-	transcript, err := ai.Transcribe(file, filename, language)
+	// Inject JSON instruction into the system prompt
+	enriched := make([]openai.ChatMessage, len(history))
+	copy(enriched, history)
+
+	jsonInstruction := `You MUST respond in JSON with: {"transcript": "word-for-word transcription of the user's audio in the language they spoke", "response": "your reply", "isLast": false}. Set isLast to true only when the conversation is ending (user says goodbye or you decide to end it). When isLast is true, respond with a natural farewell.`
+	if subtitleLanguage != "" {
+		jsonInstruction = fmt.Sprintf(`You MUST respond in JSON with: {"transcript": "word-for-word transcription of the user's audio in the language they spoke", "transcriptSubtitle": "translation of transcript in %s", "response": "your reply", "responseSubtitle": "translation of your reply in %s", "isLast": false}. Set isLast to true only when the conversation is ending (user says goodbye or you decide to end it). When isLast is true, respond with a natural farewell.`, subtitleLanguage, subtitleLanguage)
+	}
+
+	for i, msg := range enriched {
+		if msg.Role == openai.ROLE_SYSTEM {
+			enriched[i].Content = msg.Content + "\n\n" + jsonInstruction
+			break
+		}
+	}
+
+	rawResponse, err := ai.ChatWithAudio(enriched, audioData, audioFormat)
 	if err != nil {
-		return "", err
+		return openai.AnswerChatResult{}, err
 	}
 
-	if transcript.Text == "" {
-		return "", fmt.Errorf("empty transcript")
+	// gpt-audio-mini doesn't support response_format: json_object, so extract JSON manually
+	jsonStr := extractJSON(rawResponse)
+
+	var result openai.AnswerChatResult
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return openai.AnswerChatResult{}, fmt.Errorf("failed to parse answer chat JSON: %w, raw: %s", err, rawResponse)
 	}
 
-	return transcript.Text, nil
+	if result.Response == "" {
+		return openai.AnswerChatResult{}, fmt.Errorf("empty chat response")
+	}
+
+	return result, nil
 }
 
-func GenerateText(ai openai.Client, entries []openai.ChatMessage) (string, error) {
+func GenerateEndChat(ai openai.Client, history []openai.ChatMessage, subtitleLanguage string) (openai.AnswerChatResult, error) {
 	if ai == nil {
-		return "", fmt.Errorf("unsupported client")
+		return openai.AnswerChatResult{}, fmt.Errorf("unsupported client")
 	}
 
-	chatCompletion, err := ai.Chat(entries)
+	jsonInstruction := `The user has decided to end the conversation. You MUST respond in JSON with: {"response": "your farewell", "isLast": true}. Provide a natural farewell message.`
+	if subtitleLanguage != "" {
+		jsonInstruction = fmt.Sprintf(`The user has decided to end the conversation. You MUST respond in JSON with: {"response": "your farewell", "responseSubtitle": "translation of your farewell in %s", "isLast": true}. Provide a natural farewell message.`, subtitleLanguage)
+	}
+
+	messages := make([]openai.ChatMessage, len(history))
+	copy(messages, history)
+
+	// Inject JSON instruction into system prompt
+	for i, msg := range messages {
+		if msg.Role == openai.ROLE_SYSTEM {
+			messages[i].Content = msg.Content + "\n\n" + jsonInstruction
+			break
+		}
+	}
+
+	rawResponse, err := ai.Chat(messages)
 	if err != nil {
-		return "", err
+		return openai.AnswerChatResult{}, err
 	}
 
-	if chatCompletion == "" {
-		return "", fmt.Errorf("empty chat response")
+	jsonStr := extractJSON(rawResponse)
+
+	var result openai.AnswerChatResult
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return openai.AnswerChatResult{}, fmt.Errorf("failed to parse end chat JSON: %w, raw: %s", err, rawResponse)
 	}
 
-	return chatCompletion, nil
-}
+	result.IsLast = true
 
-func GenerateTextFromAudio(ai openai.Client, history []openai.ChatMessage, audioData string, audioFormat string) (string, error) {
-	if ai == nil {
-		return "", fmt.Errorf("unsupported client")
-	}
-
-	chatCompletion, err := ai.ChatWithAudio(history, audioData, audioFormat)
-	if err != nil {
-		return "", err
-	}
-
-	if chatCompletion == "" {
-		return "", fmt.Errorf("empty chat response")
-	}
-
-	return chatCompletion, nil
+	return result, nil
 }
 
 func GenerateSpeech(el elevenlab.Client, text, voice string) (string, error) {
@@ -112,34 +179,4 @@ func GenerateSpeech(el elevenlab.Client, text, voice string) (string, error) {
 	}
 
 	return base64.StdEncoding.EncodeToString(speechByte), nil
-}
-
-func GenerateSubtitle(ai openai.Client, text string, subtitleLanguage string) (string, error) {
-	if ai == nil {
-		return "", fmt.Errorf("unsupported client")
-	}
-
-	if subtitleLanguage == "" {
-		return "", nil
-	}
-
-	prompt := fmt.Sprintf("Translate the following text to %s. Only respond with the translation, nothing else:\n\n%s", subtitleLanguage, text)
-
-	messages := []openai.ChatMessage{
-		{
-			Role:    openai.ROLE_SYSTEM,
-			Content: "You are a translator. You only respond with the translated text, no explanations or additional text.",
-		},
-		{
-			Role:    openai.ROLE_USER,
-			Content: prompt,
-		},
-	}
-
-	translation, err := ai.Chat(messages)
-	if err != nil {
-		return "", err
-	}
-
-	return translation, nil
 }

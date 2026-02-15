@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 )
@@ -16,7 +15,6 @@ type Client interface {
 	Status() (Status, error)
 	Chat([]ChatMessage) (string, error)
 	ChatWithAudio(history []ChatMessage, audioData string, audioFormat string) (string, error)
-	Transcribe(io.ReadCloser, string, string) (TranscriptResponse, error)
 
 	GetDefaultTranscriptLanguage() string
 }
@@ -31,9 +29,8 @@ type OpenAI struct {
 const (
 	baseURL            = "https://api.openai.com/v1"
 	statusURL          = "https://status.openai.com/api/v2"
-	chatModel          = "gpt-4o-mini-2024-07-18"
-	audioChatModel     = "gpt-audio-mini"
-	transcriptModel    = "whisper-1"
+	chatModel          = "gpt-4o-mini"
+	audioChatModel     = "gpt-4o-mini-audio-preview"
 	transcriptLanguage = "en"
 )
 
@@ -97,7 +94,6 @@ func (c *OpenAI) Status() (Status, error) {
 		return STATUS_UNKNOWN, err
 	}
 
-	// Check relevant components (Chat Completions is the primary one used by this app)
 	targetComponents := map[string]bool{
 		"Chat Completions": true,
 		"Audio":            true,
@@ -139,8 +135,9 @@ func (c *OpenAI) Chat(messages []ChatMessage) (string, error) {
 	}
 
 	chatReq := ChatRequest{
-		Model:    c.chatModel,
-		Messages: messages,
+		Model:          c.chatModel,
+		Messages:       messages,
+		ResponseFormat: &ResponseFormat{Type: "json_object"},
 	}
 
 	body, err := json.Marshal(chatReq)
@@ -180,7 +177,6 @@ func (c *OpenAI) ChatWithAudio(history []ChatMessage, audioData string, audioFor
 		return "", err
 	}
 
-	// Convert text history to AudioChatMessage format
 	messages := make([]AudioChatMessage, 0, len(history)+1)
 	for _, msg := range history {
 		messages = append(messages, AudioChatMessage{
@@ -189,7 +185,6 @@ func (c *OpenAI) ChatWithAudio(history []ChatMessage, audioData string, audioFor
 		})
 	}
 
-	// Add the audio message as the last user message
 	messages = append(messages, AudioChatMessage{
 		Role: ROLE_USER,
 		Content: []AudioContentPart{
@@ -238,76 +233,6 @@ func (c *OpenAI) ChatWithAudio(history []ChatMessage, audioData string, audioFor
 	}
 
 	return chatResp.Choices[0].Message.Content, nil
-}
-
-func (c *OpenAI) Transcribe(file io.ReadCloser, filename, language string) (TranscriptResponse, error) {
-	if file == nil {
-		return TranscriptResponse{}, fmt.Errorf("audio is nil")
-	}
-	defer file.Close()
-
-	url, err := url.JoinPath(c.baseURL, "/audio/transcriptions")
-	if err != nil {
-		return TranscriptResponse{}, err
-	}
-
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	part, err := writer.CreateFormFile("file", filename)
-	if err != nil {
-		return TranscriptResponse{}, err
-	}
-
-	_, err = io.Copy(part, file)
-	if err != nil {
-		return TranscriptResponse{}, err
-	}
-
-	err = writer.WriteField("model", transcriptModel)
-	if err != nil {
-		return TranscriptResponse{}, err
-	}
-
-	transcriptLanguage := c.transcriptLanguage
-	if language != "" {
-		transcriptLanguage = language
-	}
-
-	err = writer.WriteField("language", transcriptLanguage)
-	if err != nil {
-		return TranscriptResponse{}, err
-	}
-
-	err = writer.Close()
-	if err != nil {
-		return TranscriptResponse{}, err
-	}
-
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, body)
-	if err != nil {
-		return TranscriptResponse{}, err
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
-	req.Header.Add("Content-Type", writer.FormDataContentType())
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return TranscriptResponse{}, err
-	}
-
-	if resp == nil || resp.Body == nil {
-		return TranscriptResponse{}, fmt.Errorf("response is nil")
-	}
-
-	var transcriptResp TranscriptResponse
-	err = unmarshalJSONResponse(resp, &transcriptResp)
-	if err != nil {
-		return TranscriptResponse{}, err
-	}
-
-	return transcriptResp, nil
 }
 
 func (c *OpenAI) GetDefaultTranscriptLanguage() string {

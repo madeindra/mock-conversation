@@ -69,7 +69,6 @@ const StartScreen: React.FC<StartScreenProps> = ({ backendHost, setError }) => {
         setMessages([{
           text: data.data?.text,
           isUser: false,
-          isAnimated: true,
           subtitle: data.data?.subtitle || '',
         }]);
         setIsIntroDone(false);

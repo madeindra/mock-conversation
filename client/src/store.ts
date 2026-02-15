@@ -20,8 +20,6 @@ const initialState = {
 export interface Message {
   text: string;
   isUser: boolean;
-  isAnimated?: boolean;
-  hasAnimated?: boolean;
   subtitle?: string;
 }
 

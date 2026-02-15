@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AnimatedText from './AnimatedText';
 import Navbar from './Navbar';
 import { Message, useConversationStore } from '../store';
 
@@ -146,7 +145,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ backendHost, setError }) => {
         const botMessage: Message = {
           text: data.data.answer.text,
           isUser: false,
-          isAnimated: true,
+
           subtitle: data.data.answer.subtitle || '',
         };
 
@@ -229,7 +228,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ backendHost, setError }) => {
         const botMessage: Message = {
           text: data.data.answer.text,
           isUser: false,
-          isAnimated: true,
+
           subtitle: data.data.answer.subtitle || '',
         };
         addMessage(botMessage);
@@ -284,10 +283,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ backendHost, setError }) => {
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-900'
                   }`}>
-                  {message.isAnimated
-                    ? <AnimatedText message={message} />
-                    : message.text
-                  }
+                  {message.text}
                 </div>
                 {showSubtitles && message.subtitle && (
                   <div className={`mt-1 text-xs text-gray-400 italic px-1 ${message.isUser ? 'text-right' : 'text-left'}`}>

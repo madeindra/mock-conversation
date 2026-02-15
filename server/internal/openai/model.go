@@ -34,9 +34,10 @@ const (
 )
 
 type SpeechRequest struct {
-	Model string `json:"model"`
-	Voice string `json:"voice"`
-	Input string `json:"input"`
+	Model string  `json:"model"`
+	Voice string  `json:"voice"`
+	Input string  `json:"input"`
+	Speed float64 `json:"speed,omitempty"`
 }
 
 // TranscriptResponse is the response from the transcription API.

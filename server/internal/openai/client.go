@@ -36,7 +36,7 @@ const (
 	baseURL            = "https://api.openai.com/v1"
 	statusURL          = "https://status.openai.com/api/v2"
 	chatModel          = "gpt-4o-mini"
-	transcriptModel    = "gpt-4o-mini-transcribe"
+	transcriptModel    = "whisper-1"
 	ttsModel           = "gpt-4o-mini-tts"
 	transcriptLanguage = "en"
 )
@@ -263,6 +263,7 @@ func (c *OpenAI) Speech(text string, voice string) (io.ReadCloser, error) {
 		Model: c.ttsModel,
 		Voice: voice,
 		Input: text,
+		Speed: 1.00,
 	}
 
 	body, err := json.Marshal(speechReq)

@@ -20,43 +20,6 @@ type Choice struct {
 	FinishReason string      `json:"finish_reason"`
 }
 
-type AudioChatRequest struct {
-	Model      string             `json:"model"`
-	Modalities []string           `json:"modalities"`
-	Messages   []AudioChatMessage `json:"messages"`
-}
-
-type AudioChatMessage struct {
-	Role    Role        `json:"role"`
-	Content interface{} `json:"content"`
-}
-
-type AudioContentPart struct {
-	Type       string      `json:"type"`
-	Text       string      `json:"text,omitempty"`
-	InputAudio *InputAudio `json:"input_audio,omitempty"`
-}
-
-type InputAudio struct {
-	Data   string `json:"data"`
-	Format string `json:"format"`
-}
-
-type AudioChatResponse struct {
-	Choices []AudioChoice `json:"choices"`
-}
-
-type AudioChoice struct {
-	Index        int              `json:"index"`
-	Message      AudioRespMessage `json:"message"`
-	FinishReason string           `json:"finish_reason"`
-}
-
-type AudioRespMessage struct {
-	Role    Role   `json:"role"`
-	Content string `json:"content"`
-}
-
 type ChatMessage struct {
 	Content string `json:"content"`
 	Role    Role   `json:"role"`
@@ -69,6 +32,11 @@ const (
 	ROLE_ASSISTANT Role = "assistant"
 	ROLE_USER      Role = "user"
 )
+
+// TranscriptResponse is the response from the transcription API.
+type TranscriptResponse struct {
+	Text string `json:"text"`
+}
 
 // AnswerChatResult is the JSON response from ChatGPT for all chat operations.
 type AnswerChatResult struct {

@@ -22,8 +22,8 @@ Each interaction makes exactly 2 API calls:
 
 ### Models
 
-- `gpt-4o-mini` — text-only chat (start chat, end chat)
-- `gpt-4o-mini-audio-preview` — audio input chat (answer chat with user audio)
+- `gpt-4o-mini-transcribe` — audio transcription (answer chat)
+- `gpt-4o-mini` — text chat with JSON response format (start chat, answer chat, end chat)
 - `eleven_multilingual_v2` — text-to-speech (ElevenLabs)
 
 ## Server

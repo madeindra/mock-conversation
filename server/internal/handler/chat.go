@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"encoding/base64"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -226,17 +226,29 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 		subtitleLanguage = config.GetLanguageName(config.GetCode(user.SubtitleLanguage))
 	}
 
-	// Send audio to gpt-audio-mini — returns transcript + response + isLast in one call
-	audioBase64 := base64.StdEncoding.EncodeToString(audioBytes)
+	// Step 1: Transcribe audio using gpt-4o-mini-transcribe
+	audioReader := io.NopCloser(bytes.NewReader(audioBytes))
+	transcript, err := util.TranscribeSpeech(h.ai, audioReader, fileHeader.Filename, user.Language)
+	if err != nil {
+		log.Printf("failed to transcribe speech: %v", err)
+		util.SendResponse(w, nil, "failed to transcribe speech", http.StatusInternalServerError)
+
+		return
+	}
+
+	// Step 2: Generate response using gpt-4o-mini with JSON format
 	history := util.ConvertToChatMessage(entries)
 
-	answerResult, err := util.GenerateTextFromAudio(h.ai, history, audioBase64, "wav", subtitleLanguage)
+	answerResult, err := util.GenerateAnswerChat(h.ai, history, transcript, subtitleLanguage)
 	if err != nil {
 		log.Printf("failed to get chat completion: %v", err)
 		util.SendResponse(w, nil, fmt.Sprintf("failed to get chat completion: %v", err), http.StatusInternalServerError)
 
 		return
 	}
+
+	// Set the transcript from Whisper (not from the chat model)
+	answerResult.Transcript = transcript
 
 	answerAudio, err := util.GenerateSpeech(h.el, answerResult.Response, user.Voice)
 	if err != nil {

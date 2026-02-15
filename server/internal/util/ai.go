@@ -5,37 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/madeindra/mock-conversation/server/internal/elevenlab"
 	"github.com/madeindra/mock-conversation/server/internal/openai"
 )
-
-// extractJSON finds and returns the first JSON object in a string.
-// Handles cases where the model wraps JSON in markdown code fences or adds extra text.
-func extractJSON(raw string) string {
-	s := strings.TrimSpace(raw)
-
-	// Strip markdown code fences
-	if strings.HasPrefix(s, "```") {
-		if idx := strings.Index(s, "\n"); idx != -1 {
-			s = s[idx+1:]
-		}
-		if idx := strings.LastIndex(s, "```"); idx != -1 {
-			s = s[:idx]
-		}
-		return strings.TrimSpace(s)
-	}
-
-	// Find the first { and last } to extract the JSON object
-	start := strings.Index(s, "{")
-	end := strings.LastIndex(s, "}")
-	if start != -1 && end != -1 && end > start {
-		return s[start : end+1]
-	}
-
-	return s
-}
 
 func GenerateStartChat(ai openai.Client, role, topic, language, subtitleLanguage string) (string, openai.AnswerChatResult, error) {
 	if ai == nil {
@@ -49,7 +22,7 @@ func GenerateStartChat(ai openai.Client, role, topic, language, subtitleLanguage
 
 	jsonInstruction := `Respond in JSON with: {"response": "your greeting"}`
 	if subtitleLanguage != "" {
-		jsonInstruction = fmt.Sprintf(`Respond in JSON with: {"response": "your greeting", "responseSubtitle": "translation of your greeting in %s"}`, subtitleLanguage)
+		jsonInstruction = fmt.Sprintf(`Respond in JSON with: {"response": "your greeting", "responseSubtitle": "complete and accurate translation of your entire greeting in %s"}`, subtitleLanguage)
 	}
 
 	messages := []openai.ChatMessage{
@@ -63,16 +36,14 @@ func GenerateStartChat(ai openai.Client, role, topic, language, subtitleLanguage
 		},
 	}
 
-	rawResponse, err := ai.Chat(messages)
+	rawJSON, err := ai.Chat(messages)
 	if err != nil {
 		return "", openai.AnswerChatResult{}, err
 	}
 
-	jsonStr := extractJSON(rawResponse)
-
 	var result openai.AnswerChatResult
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		return "", openai.AnswerChatResult{}, fmt.Errorf("failed to parse initial chat JSON: %w, raw: %s", err, rawResponse)
+	if err := json.Unmarshal([]byte(rawJSON), &result); err != nil {
+		return "", openai.AnswerChatResult{}, fmt.Errorf("failed to parse initial chat JSON: %w, raw: %s", err, rawJSON)
 	}
 
 	if result.Response == "" {
@@ -82,38 +53,49 @@ func GenerateStartChat(ai openai.Client, role, topic, language, subtitleLanguage
 	return systemPrompt, result, nil
 }
 
-func GenerateTextFromAudio(ai openai.Client, history []openai.ChatMessage, audioData, audioFormat, subtitleLanguage string) (openai.AnswerChatResult, error) {
+func TranscribeSpeech(ai openai.Client, audio io.Reader, filename string, language string) (string, error) {
+	if ai == nil {
+		return "", fmt.Errorf("unsupported client")
+	}
+
+	return ai.Transcribe(audio, filename, language)
+}
+
+func GenerateAnswerChat(ai openai.Client, history []openai.ChatMessage, transcript string, subtitleLanguage string) (openai.AnswerChatResult, error) {
 	if ai == nil {
 		return openai.AnswerChatResult{}, fmt.Errorf("unsupported client")
 	}
 
-	// Inject JSON instruction into the system prompt
-	enriched := make([]openai.ChatMessage, len(history))
-	copy(enriched, history)
-
-	jsonInstruction := `You MUST respond in JSON with: {"transcript": "word-for-word transcription of the user's audio in the language they spoke", "response": "your reply", "isLast": false}. Set isLast to true only when the conversation is ending (user says goodbye or you decide to end it). When isLast is true, respond with a natural farewell.`
+	jsonInstruction := `You MUST respond in JSON with: {"response": "your reply", "isLast": false}. Set isLast to true only when the conversation is ending (user says goodbye or you decide to end it). When isLast is true, respond with a natural farewell.`
 	if subtitleLanguage != "" {
-		jsonInstruction = fmt.Sprintf(`You MUST respond in JSON with: {"transcript": "word-for-word transcription of the user's audio in the language they spoke", "transcriptSubtitle": "translation of transcript in %s", "response": "your reply", "responseSubtitle": "translation of your reply in %s", "isLast": false}. Set isLast to true only when the conversation is ending (user says goodbye or you decide to end it). When isLast is true, respond with a natural farewell.`, subtitleLanguage, subtitleLanguage)
+		jsonInstruction = fmt.Sprintf(`You MUST respond in JSON with: {"response": "your reply", "responseSubtitle": "complete and accurate translation of your entire reply in %s", "transcriptSubtitle": "complete and accurate translation of the user's entire message in %s", "isLast": false}. Set isLast to true only when the conversation is ending (user says goodbye or you decide to end it). When isLast is true, respond with a natural farewell.`, subtitleLanguage, subtitleLanguage)
 	}
 
-	for i, msg := range enriched {
+	// Copy history and inject JSON instruction into system prompt
+	messages := make([]openai.ChatMessage, len(history))
+	copy(messages, history)
+
+	for i, msg := range messages {
 		if msg.Role == openai.ROLE_SYSTEM {
-			enriched[i].Content = msg.Content + "\n\n" + jsonInstruction
+			messages[i].Content = msg.Content + "\n\n" + jsonInstruction
 			break
 		}
 	}
 
-	rawResponse, err := ai.ChatWithAudio(enriched, audioData, audioFormat)
+	// Add the user's transcript as a new user message
+	messages = append(messages, openai.ChatMessage{
+		Role:    openai.ROLE_USER,
+		Content: transcript,
+	})
+
+	rawJSON, err := ai.Chat(messages)
 	if err != nil {
 		return openai.AnswerChatResult{}, err
 	}
 
-	// gpt-audio-mini doesn't support response_format: json_object, so extract JSON manually
-	jsonStr := extractJSON(rawResponse)
-
 	var result openai.AnswerChatResult
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		return openai.AnswerChatResult{}, fmt.Errorf("failed to parse answer chat JSON: %w, raw: %s", err, rawResponse)
+	if err := json.Unmarshal([]byte(rawJSON), &result); err != nil {
+		return openai.AnswerChatResult{}, fmt.Errorf("failed to parse answer chat JSON: %w, raw: %s", err, rawJSON)
 	}
 
 	if result.Response == "" {
@@ -130,7 +112,7 @@ func GenerateEndChat(ai openai.Client, history []openai.ChatMessage, subtitleLan
 
 	jsonInstruction := `The user has decided to end the conversation. You MUST respond in JSON with: {"response": "your farewell", "isLast": true}. Provide a natural farewell message.`
 	if subtitleLanguage != "" {
-		jsonInstruction = fmt.Sprintf(`The user has decided to end the conversation. You MUST respond in JSON with: {"response": "your farewell", "responseSubtitle": "translation of your farewell in %s", "isLast": true}. Provide a natural farewell message.`, subtitleLanguage)
+		jsonInstruction = fmt.Sprintf(`The user has decided to end the conversation. You MUST respond in JSON with: {"response": "your farewell", "responseSubtitle": "complete and accurate translation of your entire farewell in %s", "isLast": true}. Provide a natural farewell message.`, subtitleLanguage)
 	}
 
 	messages := make([]openai.ChatMessage, len(history))
@@ -144,16 +126,14 @@ func GenerateEndChat(ai openai.Client, history []openai.ChatMessage, subtitleLan
 		}
 	}
 
-	rawResponse, err := ai.Chat(messages)
+	rawJSON, err := ai.Chat(messages)
 	if err != nil {
 		return openai.AnswerChatResult{}, err
 	}
 
-	jsonStr := extractJSON(rawResponse)
-
 	var result openai.AnswerChatResult
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		return openai.AnswerChatResult{}, fmt.Errorf("failed to parse end chat JSON: %w, raw: %s", err, rawResponse)
+	if err := json.Unmarshal([]byte(rawJSON), &result); err != nil {
+		return openai.AnswerChatResult{}, fmt.Errorf("failed to parse end chat JSON: %w, raw: %s", err, rawJSON)
 	}
 
 	result.IsLast = true

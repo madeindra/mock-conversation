@@ -17,7 +17,7 @@ type Client interface {
 	Status() (Status, error)
 	Chat([]ChatMessage) (string, error)
 	Transcribe(audio io.Reader, filename string, language string) (string, error)
-	Speech(text string, voice string) (io.ReadCloser, error)
+	Speech(text string, voice string, language string) (io.ReadCloser, error)
 	RandomVoice() string
 
 	GetDefaultTranscriptLanguage() string
@@ -35,7 +35,7 @@ type OpenAI struct {
 const (
 	baseURL            = "https://api.openai.com/v1"
 	statusURL          = "https://status.openai.com/api/v2"
-	chatModel          = "gpt-4o-mini"
+	chatModel          = "gpt-4o"
 	transcriptModel    = "whisper-1"
 	ttsModel           = "gpt-4o-mini-tts"
 	transcriptLanguage = "en"
@@ -253,17 +253,18 @@ func (c *OpenAI) Transcribe(audio io.Reader, filename string, language string) (
 	return transcriptResp.Text, nil
 }
 
-func (c *OpenAI) Speech(text string, voice string) (io.ReadCloser, error) {
+func (c *OpenAI) Speech(text string, voice string, language string) (io.ReadCloser, error) {
 	url, err := url.JoinPath(c.baseURL, "/audio/speech")
 	if err != nil {
 		return nil, err
 	}
 
 	speechReq := SpeechRequest{
-		Model: c.ttsModel,
-		Voice: voice,
-		Input: text,
-		Speed: 1.00,
+		Model:        c.ttsModel,
+		Voice:        voice,
+		Input:        text,
+		Instructions: "Speak in real-life conversational speed. Speak in natural emotion that matches the tone and content of the text. Adapt your delivery to be happy, sad, fear, disgust, anger, surprise, or any emotion appropriate for what is being said.",
+		Language:     language,
 	}
 
 	body, err := json.Marshal(speechReq)

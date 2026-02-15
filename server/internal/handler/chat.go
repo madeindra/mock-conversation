@@ -80,7 +80,7 @@ func (h *handler) StartChat(w http.ResponseWriter, req *http.Request) {
 	// Pick a random voice for this conversation
 	voice := h.ai.RandomVoice()
 
-	initialAudio, err := util.GenerateSpeech(h.ai, initialResult.Response, voice)
+	initialAudio, err := util.GenerateSpeech(h.ai, initialResult.Response, voice, chatLanguage)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
@@ -240,7 +240,7 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 	// Set the transcript from Whisper (not from the chat model)
 	answerResult.Transcript = transcript
 
-	answerAudio, err := util.GenerateSpeech(h.ai, answerResult.Response, user.Voice)
+	answerAudio, err := util.GenerateSpeech(h.ai, answerResult.Response, user.Voice, user.Language)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
@@ -348,7 +348,7 @@ func (h *handler) EndChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	answerAudio, err := util.GenerateSpeech(h.ai, endResult.Response, user.Voice)
+	answerAudio, err := util.GenerateSpeech(h.ai, endResult.Response, user.Voice, user.Language)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)

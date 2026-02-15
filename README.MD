@@ -23,8 +23,8 @@ All powered by OpenAI APIs:
 ### Models
 
 - `whisper-1` — audio transcription (answer chat)
-- `gpt-4o-mini` — text chat with JSON response format (start chat, answer chat, end chat)
-- `gpt-4o-mini-tts` — text-to-speech
+- `gpt-4o` — text chat with JSON response format (start chat, answer chat, end chat)
+- `gpt-4o-mini-tts` — text-to-speech with emotion-aware delivery
 
 ## Server
 

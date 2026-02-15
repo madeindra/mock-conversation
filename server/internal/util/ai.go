@@ -140,14 +140,14 @@ func GenerateEndChat(ai openai.Client, history []openai.ChatMessage, subtitleLan
 	return result, nil
 }
 
-func GenerateSpeech(ai openai.Client, text, voice string) (string, error) {
+func GenerateSpeech(ai openai.Client, text, voice, language string) (string, error) {
 	if ai == nil {
 		return "", nil
 	}
 
 	speechInput := SanitizeString(text)
 
-	speech, err := ai.Speech(speechInput, voice)
+	speech, err := ai.Speech(speechInput, voice, language)
 	if err != nil {
 		return "", err
 	}

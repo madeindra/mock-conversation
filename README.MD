@@ -11,6 +11,20 @@ An AI-powered mock conversation tool that lets you practice conversations in any
 - **Voice Interaction**: Speak and listen with audio recording and text-to-speech
 - **Random Voice**: Each conversation gets a unique ElevenLabs voice, consistent throughout the session
 - **Natural Flow**: AI detects when the conversation is ending and responds naturally
+- **Structured JSON Responses**: Single ChatGPT API call per interaction returns transcript, response, subtitles, and conversation state
+
+## Architecture
+
+Each interaction makes exactly 2 API calls:
+
+1. **ChatGPT** — generates all text content (transcript, response, subtitles, end-of-conversation flag) in a single structured JSON response
+2. **ElevenLabs** — generates audio from the response text
+
+### Models
+
+- `gpt-4o-mini` — text-only chat (start chat, end chat)
+- `gpt-4o-mini-audio-preview` — audio input chat (answer chat with user audio)
+- `eleven_multilingual_v2` — text-to-speech (ElevenLabs)
 
 ## Server
 

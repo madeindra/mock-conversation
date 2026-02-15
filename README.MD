@@ -7,16 +7,17 @@ An AI-powered mock conversation tool that lets you practice conversations in any
 - **Any Role**: Choose what role the AI plays (e.g., Spanish tutor, debate partner, travel guide, doctor)
 - **Any Topic**: Set any conversation topic
 - **Any Language**: 15+ supported languages for conversation
-- **Subtitles**: Optional translation subtitles in a different language
+- **Subtitles**: Optional translation subtitles in a different language, toggleable during conversation
 - **Voice Interaction**: Speak and listen with audio recording and text-to-speech
-- **Conversation Summary**: Get a summary when you end the conversation
+- **Random Voice**: Each conversation gets a unique ElevenLabs voice, consistent throughout the session
+- **Natural Flow**: AI detects when the conversation is ending and responds naturally
 
 ## Server
 
-The server is built with Go 1.22 and is located in the `server` directory. It requires the following environment variables:
+The server is built with Go and is located in the `server` directory. It requires the following environment variables:
 
 - `OPENAI_API_KEY`: Your OpenAI API key (required)
-- `ELEVENLAB_API_KEY`: Your ElevenLab API key for alternative speech engine (optional)
+- `ELEVENLAB_API_KEY`: Your ElevenLabs API key for text-to-speech (optional)
 - `DB_PATH`: Path to SQLite database (optional, defaults to `./app.db`)
 
 Optional configurations:
@@ -63,6 +64,12 @@ go run main.go
 
 ```bash
 cd client
-pnpm install
-pnpm run dev
+npm install
+npm run dev
+```
+
+### Both (using Makefile)
+
+```bash
+make run
 ```

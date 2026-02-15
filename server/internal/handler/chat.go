@@ -82,7 +82,13 @@ func (h *handler) StartChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	initialAudio, err := util.GenerateSpeech(h.ai, h.el, chatLanguage, initialText)
+	// Pick a random ElevenLabs voice for this conversation
+	var voice string
+	if h.el != nil {
+		voice = h.el.RandomVoice()
+	}
+
+	initialAudio, err := util.GenerateSpeech(h.ai, h.el, chatLanguage, initialText, voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
@@ -124,7 +130,7 @@ func (h *handler) StartChat(w http.ResponseWriter, req *http.Request) {
 	}
 	defer tx.Rollback()
 
-	newUser, err := h.db.CreateChatUser(tx, hashed, chatLanguage, config.GetLanguage(startChatRequest.SubtitleLanguage))
+	newUser, err := h.db.CreateChatUser(tx, hashed, chatLanguage, config.GetLanguage(startChatRequest.SubtitleLanguage), voice)
 	if err != nil {
 		log.Printf("failed to create new chat: %v", err)
 		util.SendResponse(w, nil, "failed to create new chat", http.StatusInternalServerError)
@@ -251,7 +257,7 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 		answerText = strings.TrimSpace(answerText)
 	}
 
-	answerAudio, err := util.GenerateSpeech(h.ai, h.el, user.Language, answerText)
+	answerAudio, err := util.GenerateSpeech(h.ai, h.el, user.Language, answerText, user.Voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
@@ -386,7 +392,7 @@ func (h *handler) EndChat(w http.ResponseWriter, req *http.Request) {
 		answerText = strings.TrimSpace(answerText)
 	}
 
-	answerAudio, err := util.GenerateSpeech(h.ai, h.el, user.Language, answerText)
+	answerAudio, err := util.GenerateSpeech(h.ai, h.el, user.Language, answerText, user.Voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)

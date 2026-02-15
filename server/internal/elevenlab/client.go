@@ -7,12 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
 )
 
 type Client interface {
-	TextToSpeech(string) (io.ReadCloser, error)
+	TextToSpeech(input string, voice string) (io.ReadCloser, error)
+	RandomVoice() string
 }
 
 type ElevenLab struct {
@@ -28,6 +30,30 @@ const (
 	ttsVoice = "cgSgspJ2msm6clMCkdW9"
 )
 
+var voiceIDs = []string{
+	"hpp4J3VqNfWAUOO0d1Us", // Bella
+	"CwhRBWXzGAHq8TQ4Fs17", // Roger
+	"EXAVITQu4vr4xnSDxMaL", // Sarah
+	"FGY2WhTYpPnrIDTdsKH5", // Laura
+	"IKne3meq5aSn9XLyUdCD", // Charlie
+	"JBFqnCBsd6RMkjVDRZzb", // George
+	"N2lVS1w4EtoT3dr4eOWO", // Callum
+	"SAz9YHcvj6GT2YYXdXww", // River
+	"SOYHLrjzK2X1ezoPC6cr", // Harry
+	"TX3LPaxmHKxFdv7VOQHJ", // Liam
+	"Xb7hH8MSUJpSbSDYk0k2", // Alice
+	"XrExE9yKIg1WjnnlVkGX", // Matilda
+	"bIHbv24MWmeRgasZH58o", // Will
+	"cgSgspJ2msm6clMCkdW9", // Jessica
+	"cjVigY5qzO86Huf0OWal", // Eric
+	"iP95p4xoKVk53GoZ742B", // Chris
+	"nPczCjzI2devNBz1zQrb", // Brian
+	"onwK4e9ZLuTAKqWW03F9", // Daniel
+	"pFZP5JQG7iQjIQuC4Bku", // Lily
+	"pNInz6obpgDQGcFmaJgB", // Adam
+	"pqHfZKP75CvOlQylNhV4", // Bill
+}
+
 var defaultVoiceSetting = VoiceSetting{
 	Stability:       0.5,
 	SimilarityBoost: 0.75,
@@ -42,8 +68,16 @@ func NewElevenLab(apiKey string) *ElevenLab {
 	}
 }
 
-func (c *ElevenLab) TextToSpeech(input string) (io.ReadCloser, error) {
-	url, err := url.JoinPath(c.baseURL, "text-to-speech", c.ttsVoice)
+func (c *ElevenLab) RandomVoice() string {
+	return voiceIDs[rand.Intn(len(voiceIDs))]
+}
+
+func (c *ElevenLab) TextToSpeech(input string, voice string) (io.ReadCloser, error) {
+	if voice == "" {
+		voice = c.ttsVoice
+	}
+
+	url, err := url.JoinPath(c.baseURL, "text-to-speech", voice)
 	if err != nil {
 		return nil, err
 	}

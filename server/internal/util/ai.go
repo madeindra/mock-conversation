@@ -77,7 +77,7 @@ func GenerateText(ai openai.Client, entries []openai.ChatMessage) (string, error
 	return chatCompletion, nil
 }
 
-func GenerateSpeech(ai openai.Client, el elevenlab.Client, language, text string) (string, error) {
+func GenerateSpeech(ai openai.Client, el elevenlab.Client, language, text, voice string) (string, error) {
 	if ai == nil {
 		return "", fmt.Errorf("unsupported client")
 	}
@@ -93,7 +93,7 @@ func GenerateSpeech(ai openai.Client, el elevenlab.Client, language, text string
 
 		speech = tts
 	} else if el != nil {
-		tts, err := el.TextToSpeech(speechInput)
+		tts, err := el.TextToSpeech(speechInput, voice)
 		if err != nil {
 			return "", err
 		}

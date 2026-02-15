@@ -28,7 +28,8 @@ func migrate(db *sql.DB) {
 		id VARCHAR PRIMARY KEY,
 		secret VARCHAR NOT NULL,
 		language VARCHAR DEFAULT 'en',
-		subtitle_language VARCHAR DEFAULT ''
+		subtitle_language VARCHAR DEFAULT '',
+		voice VARCHAR DEFAULT ''
 	);`
 
 	chatTable := `CREATE TABLE IF NOT EXISTS chats (

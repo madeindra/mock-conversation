@@ -11,7 +11,6 @@ const initialState = {
   conversationSecret: "",
   initialAudio: "",
   initialText: "",
-  initialSSML: "",
   initialSubtitle: "",
   messages: [] as Array<Message>,
   isIntroDone: false,
@@ -35,7 +34,6 @@ interface ConversationState {
   conversationSecret: string;
   initialAudio: string;
   initialText: string;
-  initialSSML: string;
   initialSubtitle: string;
   messages: Array<Message>;
   isIntroDone: boolean;
@@ -49,7 +47,6 @@ interface ConversationState {
   setConversationSecret: (secret: string) => void;
   setInitialAudio: (audio: string) => void;
   setInitialText: (text: string) => void;
-  setInitialSSML: (text: string) => void;
   setInitialSubtitle: (subtitle: string) => void;
   setMessages: (messages: Array<Message>) => void;
   addMessage: (message: Message) => void;
@@ -70,7 +67,6 @@ export const useConversationStore = create<ConversationState>((set) => ({
   setConversationSecret: (secret) => set({ conversationSecret: secret }),
   setInitialAudio: (audio) => set({ initialAudio: audio }),
   setInitialText: (text) => set({ initialText: text }),
-  setInitialSSML: (text) => set({ initialSSML: text }),
   setInitialSubtitle: (subtitle) => set({ initialSubtitle: subtitle }),
   setMessages: (messages) => set({ messages }),
   addMessage: (message) =>

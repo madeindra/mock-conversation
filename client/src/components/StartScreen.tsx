@@ -31,7 +31,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ backendHost, setError }) => {
     role, topic, language, subtitleLanguage, messages,
     setIsIntroDone, setMessages, setRole, setTopic, setLanguage,
     setSubtitleLanguage, setConversationId, setConversationSecret,
-    setInitialAudio, setInitialText, setInitialSSML, setInitialSubtitle,
+    setInitialAudio, setInitialText, setInitialSubtitle,
     setHasEnded,
   } = useConversationStore();
 
@@ -63,7 +63,6 @@ const StartScreen: React.FC<StartScreenProps> = ({ backendHost, setError }) => {
         setConversationSecret(data.data?.secret);
         setInitialAudio(data.data?.audio);
         setInitialText(data.data?.text);
-        setInitialSSML(data.data?.ssml);
         setInitialSubtitle(data.data?.subtitle || '');
         setLanguage(data.data?.language);
 

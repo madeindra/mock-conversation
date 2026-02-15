@@ -3,7 +3,6 @@ package openai
 import (
 	"bytes"
 	"context"
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,50 +15,33 @@ type Client interface {
 	IsKeyValid() (bool, error)
 	Status() (Status, error)
 	Chat([]ChatMessage) (string, error)
-	TextToSpeech(string) (io.ReadCloser, error)
+	ChatWithAudio(history []ChatMessage, audioData string, audioFormat string) (string, error)
 	Transcribe(io.ReadCloser, string, string) (TranscriptResponse, error)
 
-	SSML(string) (string, error)
-
 	GetDefaultTranscriptLanguage() string
-	IsSpeechAvailable(string) bool
 }
 
 type OpenAI struct {
 	apiKey             string
 	baseURL            string
 	chatModel          string
-	transcriptModel    string
 	transcriptLanguage string
-	ttsModel           string
-	ttsVoice           string
 }
 
 const (
 	baseURL            = "https://api.openai.com/v1"
 	statusURL          = "https://status.openai.com/api/v2"
 	chatModel          = "gpt-4o-mini-2024-07-18"
+	audioChatModel     = "gpt-audio-mini"
 	transcriptModel    = "whisper-1"
 	transcriptLanguage = "en"
-	ttsModel           = "tts-1"
-	ttsVoice           = "nova"
 )
-
-var supportedTranscriptLanguages = map[string]struct{}{
-	"en": {},
-}
-
-//go:embed templates/ssml.prompt.txt
-var ssmlPrompt string
 
 func NewOpenAI(apiKey string) *OpenAI {
 	return &OpenAI{
 		apiKey:             apiKey,
 		baseURL:            baseURL,
 		chatModel:          chatModel,
-		transcriptModel:    transcriptModel,
-		ttsModel:           ttsModel,
-		ttsVoice:           ttsVoice,
 		transcriptLanguage: transcriptLanguage,
 	}
 }
@@ -192,26 +174,49 @@ func (c *OpenAI) Chat(messages []ChatMessage) (string, error) {
 	return chatResp.Choices[0].Message.Content, nil
 }
 
-func (c *OpenAI) TextToSpeech(input string) (io.ReadCloser, error) {
-	url, err := url.JoinPath(c.baseURL, "/audio/speech")
+func (c *OpenAI) ChatWithAudio(history []ChatMessage, audioData string, audioFormat string) (string, error) {
+	url, err := url.JoinPath(c.baseURL, "/chat/completions")
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	ttsReq := TTSRequest{
-		Model: c.ttsModel,
-		Voice: c.ttsVoice,
-		Input: input,
+	// Convert text history to AudioChatMessage format
+	messages := make([]AudioChatMessage, 0, len(history)+1)
+	for _, msg := range history {
+		messages = append(messages, AudioChatMessage{
+			Role:    msg.Role,
+			Content: msg.Content,
+		})
 	}
 
-	body, err := json.Marshal(ttsReq)
+	// Add the audio message as the last user message
+	messages = append(messages, AudioChatMessage{
+		Role: ROLE_USER,
+		Content: []AudioContentPart{
+			{
+				Type: "input_audio",
+				InputAudio: &InputAudio{
+					Data:   audioData,
+					Format: audioFormat,
+				},
+			},
+		},
+	})
+
+	chatReq := AudioChatRequest{
+		Model:      audioChatModel,
+		Modalities: []string{"text"},
+		Messages:   messages,
+	}
+
+	body, err := json.Marshal(chatReq)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
@@ -219,14 +224,20 @@ func (c *OpenAI) TextToSpeech(input string) (io.ReadCloser, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
-	}
-	respBody, err := getResponseBody(resp)
-	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return respBody, nil
+	var chatResp AudioChatResponse
+	err = unmarshalJSONResponse(resp, &chatResp)
+	if err != nil {
+		return "", err
+	}
+
+	if len(chatResp.Choices) == 0 {
+		return "", fmt.Errorf("no valid response returned")
+	}
+
+	return chatResp.Choices[0].Message.Content, nil
 }
 
 func (c *OpenAI) Transcribe(file io.ReadCloser, filename, language string) (TranscriptResponse, error) {
@@ -253,7 +264,7 @@ func (c *OpenAI) Transcribe(file io.ReadCloser, filename, language string) (Tran
 		return TranscriptResponse{}, err
 	}
 
-	err = writer.WriteField("model", c.transcriptModel)
+	err = writer.WriteField("model", transcriptModel)
 	if err != nil {
 		return TranscriptResponse{}, err
 	}
@@ -299,64 +310,8 @@ func (c *OpenAI) Transcribe(file io.ReadCloser, filename, language string) (Tran
 	return transcriptResp, nil
 }
 
-func (c *OpenAI) SSML(text string) (string, error) {
-	url, err := url.JoinPath(c.baseURL, "/chat/completions")
-	if err != nil {
-		return "", err
-	}
-
-	chatReq := ChatRequest{
-		Model: c.chatModel,
-		Messages: []ChatMessage{
-			{
-				Role:    ROLE_SYSTEM,
-				Content: ssmlPrompt,
-			},
-			{
-				Role:    ROLE_USER,
-				Content: text,
-			},
-		},
-	}
-
-	body, err := json.Marshal(chatReq)
-	if err != nil {
-		return "", err
-	}
-
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-
-	var chatResp ChatResponse
-	err = unmarshalJSONResponse(resp, &chatResp)
-	if err != nil {
-		return "", err
-	}
-
-	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no valid response returned")
-	}
-
-	return chatResp.Choices[0].Message.Content, nil
-}
-
 func (c *OpenAI) GetDefaultTranscriptLanguage() string {
 	return string(c.transcriptLanguage)
-}
-
-func (c *OpenAI) IsSpeechAvailable(lang string) bool {
-	_, ok := supportedTranscriptLanguages[lang]
-	return ok
 }
 
 func getResponseBody(resp *http.Response) (io.ReadCloser, error) {
@@ -365,7 +320,9 @@ func getResponseBody(resp *http.Response) (io.ReadCloser, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	return resp.Body, nil

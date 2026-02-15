@@ -1,7 +1,11 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -88,18 +92,12 @@ func (h *handler) StartChat(w http.ResponseWriter, req *http.Request) {
 		voice = h.el.RandomVoice()
 	}
 
-	initialAudio, err := util.GenerateSpeech(h.ai, h.el, chatLanguage, initialText, voice)
+	initialAudio, err := util.GenerateSpeech(h.el, initialText, voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
 
 		return
-	}
-
-	var initialSSML string
-	if initialAudio == "" {
-		initialSSML, err = util.GenerateSSML(h.ai, initialText)
-		log.Printf("failed to generate ssml: %v", err)
 	}
 
 	// Generate subtitle for initial text if subtitle language is enabled
@@ -169,7 +167,6 @@ func (h *handler) StartChat(w http.ResponseWriter, req *http.Request) {
 		Chat: model.Chat{
 			Text:     initialText,
 			Audio:    initialAudio,
-			SSML:     initialSSML,
 			Subtitle: initialSubtitle,
 		},
 	}
@@ -226,7 +223,18 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 	}
 	defer file.Close()
 
-	transcriptText, err := util.TranscribeSpeech(h.ai, file, fileHeader.Filename, user.Language)
+	// Read audio file into memory
+	audioBytes, err := io.ReadAll(file)
+	if err != nil {
+		log.Printf("failed to read audio file: %v", err)
+		util.SendResponse(w, nil, "failed to read audio file", http.StatusInternalServerError)
+
+		return
+	}
+
+	// Transcribe audio via Whisper for user's transcript display
+	audioReader := io.NopCloser(bytes.NewReader(audioBytes))
+	transcriptText, err := util.TranscribeSpeech(h.ai, audioReader, fileHeader.Filename, user.Language)
 	if err != nil {
 		log.Printf("failed to transcribe speech: %v", err)
 		util.SendResponse(w, nil, "failed to transcribe speech", http.StatusInternalServerError)
@@ -234,17 +242,14 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Send audio to gpt-audio-mini for the AI response
+	audioBase64 := base64.StdEncoding.EncodeToString(audioBytes)
 	history := util.ConvertToChatMessage(entries)
 
-	chatHistory := append(history, openai.ChatMessage{
-		Role:    openai.ROLE_USER,
-		Content: transcriptText,
-	})
-
-	answerText, err := util.GenerateText(h.ai, chatHistory)
+	answerText, err := util.GenerateTextFromAudio(h.ai, history, audioBase64, "wav")
 	if err != nil {
 		log.Printf("failed to get chat completion: %v", err)
-		util.SendResponse(w, nil, "failed to get chat completion", http.StatusInternalServerError)
+		util.SendResponse(w, nil, fmt.Sprintf("failed to get chat completion: %v", err), http.StatusInternalServerError)
 
 		return
 	}
@@ -257,18 +262,12 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 		answerText = strings.TrimSpace(answerText)
 	}
 
-	answerAudio, err := util.GenerateSpeech(h.ai, h.el, user.Language, answerText, user.Voice)
+	answerAudio, err := util.GenerateSpeech(h.el, answerText, user.Voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
 
 		return
-	}
-
-	var answerSSML string
-	if answerAudio == "" {
-		answerSSML, err = util.GenerateSSML(h.ai, answerText)
-		log.Printf("failed to generate ssml: %v", err)
 	}
 
 	// Generate subtitle translation if enabled
@@ -329,7 +328,6 @@ func (h *handler) AnswerChat(w http.ResponseWriter, req *http.Request) {
 		Answer: model.Chat{
 			Text:     answerText,
 			Audio:    answerAudio,
-			SSML:     answerSSML,
 			Subtitle: answerSubtitle,
 		},
 	}
@@ -392,18 +390,12 @@ func (h *handler) EndChat(w http.ResponseWriter, req *http.Request) {
 		answerText = strings.TrimSpace(answerText)
 	}
 
-	answerAudio, err := util.GenerateSpeech(h.ai, h.el, user.Language, answerText, user.Voice)
+	answerAudio, err := util.GenerateSpeech(h.el, answerText, user.Voice)
 	if err != nil {
 		log.Printf("failed to generate speech: %v", err)
 		util.SendResponse(w, nil, "failed to generate speech", http.StatusInternalServerError)
 
 		return
-	}
-
-	var answerSSML string
-	if answerAudio == "" {
-		answerSSML, err = util.GenerateSSML(h.ai, answerText)
-		log.Printf("failed to generate ssml: %v", err)
 	}
 
 	// Generate subtitle for end message if enabled
@@ -445,7 +437,6 @@ func (h *handler) EndChat(w http.ResponseWriter, req *http.Request) {
 		Answer: model.Chat{
 			Text:     answerText,
 			Audio:    answerAudio,
-			SSML:     answerSSML,
 			Subtitle: answerSubtitle,
 		},
 	}

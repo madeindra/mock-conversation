@@ -77,30 +77,33 @@ func GenerateText(ai openai.Client, entries []openai.ChatMessage) (string, error
 	return chatCompletion, nil
 }
 
-func GenerateSpeech(ai openai.Client, el elevenlab.Client, language, text, voice string) (string, error) {
+func GenerateTextFromAudio(ai openai.Client, history []openai.ChatMessage, audioData string, audioFormat string) (string, error) {
 	if ai == nil {
 		return "", fmt.Errorf("unsupported client")
 	}
 
+	chatCompletion, err := ai.ChatWithAudio(history, audioData, audioFormat)
+	if err != nil {
+		return "", err
+	}
+
+	if chatCompletion == "" {
+		return "", fmt.Errorf("empty chat response")
+	}
+
+	return chatCompletion, nil
+}
+
+func GenerateSpeech(el elevenlab.Client, text, voice string) (string, error) {
+	if el == nil {
+		return "", nil
+	}
+
 	speechInput := SanitizeString(text)
 
-	var speech io.ReadCloser
-	if ai.IsSpeechAvailable(language) {
-		tts, err := ai.TextToSpeech(speechInput)
-		if err != nil {
-			return "", err
-		}
-
-		speech = tts
-	} else if el != nil {
-		tts, err := el.TextToSpeech(speechInput, voice)
-		if err != nil {
-			return "", err
-		}
-
-		speech = tts
-	} else {
-		return "", nil // quietly ignore unsupported language when alternative api not available
+	speech, err := el.TextToSpeech(speechInput, voice)
+	if err != nil {
+		return "", err
 	}
 
 	speechByte, err := io.ReadAll(speech)
@@ -109,32 +112,6 @@ func GenerateSpeech(ai openai.Client, el elevenlab.Client, language, text, voice
 	}
 
 	return base64.StdEncoding.EncodeToString(speechByte), nil
-}
-
-func GenerateSSML(ai openai.Client, text string) (string, error) {
-	if ai == nil {
-		return "", fmt.Errorf("unsupported client")
-	}
-
-	ssml, err := ai.SSML(text)
-	if err != nil {
-		return "", err
-	}
-
-	if ssml == "" {
-		return "", fmt.Errorf("empty ssml response")
-	}
-
-	sanitized, err := SanitizeSSML(ssml)
-	if err != nil {
-		return "", nil // quietly ignore improper formatted response
-	}
-
-	if err := ValidateIdentical(text, sanitized); err != nil {
-		return "", nil // quietly ignore ssml that differs to the original text
-	}
-
-	return sanitized, nil
 }
 
 func GenerateSubtitle(ai openai.Client, text string, subtitleLanguage string) (string, error) {

@@ -10,11 +10,13 @@ interface ChatScreenProps {
 }
 
 const ChatScreen: React.FC<ChatScreenProps> = ({ backendHost, setError }) => {
-  const { messages, initialText, initialSSML, initialAudio, language, isIntroDone, conversationId, conversationSecret, hasEnded, addMessage, setIsIntroDone, setHasEnded, resetStore } = useConversationStore();
+  const { messages, initialText, initialSSML, initialAudio, language, subtitleLanguage, isIntroDone, conversationId, conversationSecret, hasEnded, addMessage, setIsIntroDone, setHasEnded, resetStore } = useConversationStore();
 
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const hasSubtitles = subtitleLanguage !== '';
+  const [showSubtitles, setShowSubtitles] = useState(hasSubtitles);
 
   const navigate = useNavigate();
 
@@ -246,7 +248,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ backendHost, setError }) => {
                     : message.text
                   }
                 </div>
-                {message.subtitle && (
+                {showSubtitles && message.subtitle && (
                   <div className={`mt-1 text-xs text-gray-400 italic px-1 ${message.isUser ? 'text-right' : 'text-left'}`}>
                     {message.subtitle}
                   </div>
@@ -258,7 +260,22 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ backendHost, setError }) => {
       </div>
 
       <div className="border-t border-gray-100 bg-white px-4 py-3">
-        <div className="max-w-2xl mx-auto flex gap-3">
+        <div className="max-w-2xl mx-auto flex gap-3 items-center">
+          <button
+            onClick={() => setShowSubtitles(!showSubtitles)}
+            disabled={!hasSubtitles}
+            className={`p-3 rounded-xl transition-all ${!hasSubtitles
+              ? 'text-gray-300 cursor-not-allowed'
+              : showSubtitles
+                ? 'text-blue-600 bg-blue-50'
+                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+              }`}
+            title={!hasSubtitles ? 'No subtitle language selected' : showSubtitles ? 'Hide subtitles' : 'Show subtitles'}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+            </svg>
+          </button>
           <button
             onClick={isRecording ? stopRecording : startRecording}
             disabled={isProcessing || hasEnded}
